@@ -6,13 +6,13 @@
 <title>Tri-County Service Tool</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <!-- Microsoft Authentication Library (MSAL) -->
-<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/dist/msal-browser.min.js" crossorigin="anonymous"></script>
+<script src="https://alcdn.msauth.net/browser/2.28.1/js/msal-browser.min.js" crossorigin="anonymous"></script>
 <script>
 // Fallback if primary MSAL CDN fails
 window.addEventListener('error', function(e) {
   if (e.filename && e.filename.includes('msal')) {
     var s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/dist/msal-browser.min.js';
+    s.src = 'https://alcdn.msauth.net/browser/2.28.1/js/msal-browser.min.js';
     document.head.appendChild(s);
   }
 }, true);
@@ -3656,19 +3656,16 @@ window.addEventListener('error', function(e) {
   function initMsal() {
     try {
       msalInstance = new msal.PublicClientApplication(msalConfig);
-      // MSAL v3 requires initialize() before use
-      msalInstance.initialize().then(() => {
-        msalInstance.handleRedirectPromise().then(response => {
-          if (response) { handleMsResponse(response); }
-          else {
-            const accounts = msalInstance.getAllAccounts();
-            if (accounts.length > 0) {
-              msAccount = accounts[0];
-              acquireTokenSilent();
-            }
+      msalInstance.handleRedirectPromise().then(response => {
+        if (response) { handleMsResponse(response); }
+        else {
+          const accounts = msalInstance.getAllAccounts();
+          if (accounts.length > 0) {
+            msAccount = accounts[0];
+            acquireTokenSilent();
           }
-        }).catch(e => console.warn('MSAL redirect error:', e));
-      }).catch(e => console.warn('MSAL initialize error:', e));
+        }
+      }).catch(e => console.warn('MSAL redirect error:', e));
     } catch(e) {
       console.warn('MSAL init error:', e);
     }
@@ -3677,7 +3674,6 @@ window.addEventListener('error', function(e) {
   async function msSignIn() {
     if (!msalInstance) { showToast('Auth not ready — reload page'); return; }
     try {
-      await msalInstance.initialize();
       const response = await msalInstance.loginPopup({ scopes });
       handleMsResponse(response);
     } catch(e) {
