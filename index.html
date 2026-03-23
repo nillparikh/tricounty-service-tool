@@ -1398,7 +1398,7 @@ window.addEventListener('error', function(e) {
   </div>
 
   <!-- CLOSE-OUT MODAL OVERLAY -->
-  <div id="closeoutOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:200; overflow-y:auto; padding:20px;">
+  <div id="closeoutOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:500; overflow-y:auto; padding:20px;">
     <div style="max-width:560px; margin:0 auto;">
 
       <div style="background:var(--steel); border:1px solid var(--rule); border-top:3px solid var(--orange); border-radius:4px; overflow:hidden;">
@@ -1742,20 +1742,24 @@ window.addEventListener('error', function(e) {
   </div>
 
   <!-- EXPORT PREVIEW MODAL -->
-  <div id="exportOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.92); z-index:300; overflow-y:auto; padding:16px;">
+  <div id="exportOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.92); z-index:500; overflow-y:auto; padding:16px;">
     <div style="max-width:600px; margin:0 auto;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
         <div style="font-family:'Barlow Condensed',sans-serif; font-weight:800; font-size:16px; text-transform:uppercase; letter-spacing:0.05em; color:var(--white);" id="exportTitle">Export Preview</div>
         <div style="display:flex; gap:8px; align-items:center;">
           <button onclick="copyExportText()" style="background:var(--plate); border:1px solid var(--rule); color:var(--light); font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; padding:8px 14px; border-radius:3px; cursor:pointer;">📋 Copy</button>
-          <button onclick="closeExport()" style="background:var(--orange); border:none; color:var(--black); font-family:'Barlow Condensed',sans-serif; font-weight:800; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; padding:8px 14px; border-radius:3px; cursor:pointer;">✕ Close</button>
+          <button onclick="closeExport()" style="background:var(--orange); border:none; color:var(--black); font-family:'Barlow Condensed',sans-serif; font-weight:800; font-size:13px; letter-spacing:0.08em; text-transform:uppercase; padding:8px 18px; border-radius:3px; cursor:pointer;">✕ Close</button>
         </div>
       </div>
+      <div style="background:var(--steel);border:1px solid var(--rule);border-radius:4px;padding:10px 14px;margin-bottom:10px;font-size:12px;color:var(--dim);">
+        💡 Use <strong style="color:var(--light)">📋 Copy</strong> to copy this content, then paste into Word, email, or your quoting system.
+      </div>
       <div id="exportContent" style="background:white; border-radius:4px; padding:24px; color:#1a1a1a; font-family:Arial,sans-serif; font-size:13px; line-height:1.7;"></div>
+      <button onclick="closeExport()" style="width:100%;margin-top:12px;background:var(--plate);border:1px solid var(--rule);color:var(--light);font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:14px;letter-spacing:0.1em;text-transform:uppercase;padding:14px;border-radius:3px;cursor:pointer;">← Back</button>
     </div>
   </div>
   <!-- NEW CASE STUDY MODAL -->
-  <div id="newCaseOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:250; overflow-y:auto; padding:16px;">
+  <div id="newCaseOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:500; overflow-y:auto; padding:16px;">
     <div style="max-width:560px; margin:0 auto;">
       <div style="background:var(--steel); border:1px solid var(--rule); border-top:3px solid var(--orange); border-radius:4px; overflow:hidden;">
 
@@ -2320,23 +2324,58 @@ window.addEventListener('error', function(e) {
   // --- IDENTIFY PART ---
   function identifyPart() {
     const model = document.getElementById('sawModel').value;
-    const desc = document.getElementById('partDescription') ? document.getElementById('partDescription').value.toLowerCase() : '';
+    const descEl = document.getElementById('partDescription');
+    const desc = descEl ? descEl.value.trim() : '';
+    const descLower = desc.toLowerCase();
 
-    // Try DB match first
-    const match = partsDB.find(p => p.name.toLowerCase().includes(desc) || desc.includes(p.name.toLowerCase().split(' ')[0]));
-    if (match && desc.length > 2) {
+    if (!desc && !document.getElementById('photoPreview')?.classList.contains('visible')) {
+      showToast('Enter a part name or take a photo first');
+      return;
+    }
+
+    // Try DB match — multiple strategies
+    let match = null;
+    if (descLower.length > 1) {
+      // Exact name match
+      match = partsDB.find(p => p.name.toLowerCase() === descLower);
+      // Contains full description
+      if (!match) match = partsDB.find(p => p.name.toLowerCase().includes(descLower));
+      // Description contains part name word
+      if (!match) match = partsDB.find(p => descLower.includes(p.name.toLowerCase()));
+      // Any word match
+      if (!match) {
+        const words = descLower.split(/\s+/).filter(w => w.length > 2);
+        match = partsDB.find(p => words.some(w => p.name.toLowerCase().includes(w)));
+      }
+    }
+
+    if (match) {
       showResult(match, 94);
       return;
     }
 
-    // Fallback AI result
-    const fallback = {
-      partNum: 'TBD-AI',
-      name: desc ? desc.replace(/\b\w/g, c => c.toUpperCase()) : 'Part Identified from Photo',
-      meta: (model || 'Selected Saw') + ' · Pending price lookup',
-      price: 'Price TBD'
-    };
-    showResult(fallback, 72);
+    // Fallback — create a TBD entry so it can still be added
+    if (desc.length > 0) {
+      const fallback = {
+        partNum: 'TBD-' + Date.now().toString().slice(-4),
+        name: desc.replace(/\b\w/g, c => c.toUpperCase()),
+        meta: (model || 'Selected Saw') + ' · Price TBD',
+        price: 'Price TBD',
+        fits: model || 'Unknown',
+        system: 'mechanical'
+      };
+      showResult(fallback, 65);
+    } else {
+      const photoFallback = {
+        partNum: 'TBD-PHOTO',
+        name: 'Part from Photo',
+        meta: (model || 'Selected Saw') + ' · Price TBD',
+        price: 'Price TBD',
+        fits: model || 'Unknown',
+        system: 'mechanical'
+      };
+      showResult(photoFallback, 70);
+    }
   }
 
   function showResult(part, confidence) {
@@ -2354,17 +2393,20 @@ window.addEventListener('error', function(e) {
     }, 18);
     document.getElementById('resultPartNum').textContent = part.partNum;
     document.getElementById('resultPartName').textContent = part.name;
-    document.getElementById('resultPartMeta').textContent = part.meta || part.fits + ' · ' + part.system;
+    document.getElementById('resultPartMeta').textContent = part.meta || (part.fits || '') + ' · ' + (part.system || '');
     document.getElementById('resultPartPrice').textContent = part.price;
   }
 
   // --- ADD TO JOB LIST ---
   function addToJobList(item) {
     const part = item || currentResult;
-    if (!part) return;
+    if (!part) { showToast('No part selected'); return; }
+    // Apply confirmed price if available
+    const pricingDB = loadPricingDB();
+    if (pricingDB[part.partNum]) part.price = pricingDB[part.partNum];
     jobItems.push({ ...part, qty: 1, id: Date.now() });
     updateJobList();
-    showToast('Part added to job list');
+    showToast('✅ ' + part.name + ' added');
   }
 
   // =============================================================
@@ -2467,6 +2509,7 @@ window.addEventListener('error', function(e) {
             <button class="qty-btn" onclick="changeQty(${item.id},1)">+</button>
           </div>
           <div class="part-price" id="price-display-${item.id}" style="margin-top:4px;text-align:center;color:${needsPrice ? 'var(--yellow)' : 'var(--yellow)'};">${displayPrice}</div>
+          <button onclick="removeJobItem(${item.id})" style="margin-top:4px;background:none;border:none;color:var(--red);font-size:11px;font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;width:100%;">🗑 Remove</button>
         </div>
       `;
       list.appendChild(el);
@@ -2480,6 +2523,12 @@ window.addEventListener('error', function(e) {
     if (!formatted) return;
     showToast('✓ Price saved — ' + partNum + ' = ' + formatted);
     updateJobList();
+  }
+
+  function removeJobItem(id) {
+    jobItems = jobItems.filter(i => i.id !== id);
+    updateJobList();
+    showToast('Part removed');
   }
 
   function changeQty(id, delta) {
@@ -2592,13 +2641,13 @@ window.addEventListener('error', function(e) {
       const m = msg.toLowerCase();
       // Detect symptom keywords
       if (m.includes('not cut') || m.includes('crooked') || m.includes('drift') || m.includes('track')) return startDiag('blade_track', msg);
-      if (m.includes('not start') || m.includes('won\'t start') || m.includes('no power') || m.includes('dead')) return startDiag('no_start', msg);
-      if (m.includes('head') && (m.includes('fast') || m.includes('drop') || m.includes('slam') || m.includes('feed'))) return startDiag('head_feed', msg);
-      if (m.includes('leak') || m.includes('oil')) return startDiag('oil_leak', msg);
-      if (m.includes('vise') || m.includes('clamp')) return startDiag('vise', msg);
-      if (m.includes('vibrat') || m.includes('noise') || m.includes('loud') || m.includes('bang')) return startDiag('vibration', msg);
-      if (m.includes('blade') && (m.includes('break') || m.includes('snap') || m.includes('broke'))) return startDiag('blade_break', msg);
-      if (m.includes('slow') || m.includes('not cutting') || m.includes('struggle')) return startDiag('slow_cut', msg);
+      if (m.includes('not start') || m.includes('won\'t start') || m.includes('no power') || m.includes('dead') || m.includes('not turn') || m.includes('not run')) return startDiag('no_start', msg);
+      if ((m.includes('head') || m.includes('bow')) && (m.includes('fast') || m.includes('drop') || m.includes('slam') || m.includes('feed') || m.includes('not move') || m.includes('not going') || m.includes('stuck') || m.includes('no move') || m.includes('won\'t move') || m.includes('not moving'))) return startDiag('head_feed', msg);
+      if (m.includes('leak') || m.includes('oil') || m.includes('fluid')) return startDiag('oil_leak', msg);
+      if (m.includes('vise') || m.includes('clamp') || m.includes('vice')) return startDiag('vise', msg);
+      if (m.includes('vibrat') || m.includes('noise') || m.includes('loud') || m.includes('bang') || m.includes('rattle') || m.includes('squeal')) return startDiag('vibration', msg);
+      if (m.includes('blade') && (m.includes('break') || m.includes('snap') || m.includes('broke') || m.includes('snapping'))) return startDiag('blade_break', msg);
+      if (m.includes('slow') || m.includes('not cutting') || m.includes('struggle') || m.includes('taking long')) return startDiag('slow_cut', msg);
       // Not recognized — ask
       diagState = { stage: 'get_symptom' };
       return "Let's figure this out together. Can you describe what the saw is doing — or not doing? For example: making a noise, not cutting straight, head dropping too fast, blade breaking, won't start...";
@@ -2664,7 +2713,14 @@ window.addEventListener('error', function(e) {
     ],
 
     head_feed: [
-      "Head dropping too fast or no feed control — this is almost always hydraulic.\n\n<div class='diag-step'><div class='diag-label'>Check 1 — Feed Rate Knob</div>Is the feed rate knob responding at all? Try turning it fully closed (counter-clockwise). Does the head slow down even slightly?</div>",
+      (msg) => {
+        const m = msg.toLowerCase();
+        // Head not moving vs head moving too fast are different problems
+        if (m.includes('not move') || m.includes('not moving') || m.includes('stuck') || m.includes('won\'t move') || m.includes('no move') || m.includes('not going')) {
+          return "Head not moving at all — let's check the hydraulic system first.\n\n<div class='diag-step'><div class='diag-label'>Check 1 — Hydraulic Pressure</div>Is the machine powered on and running? Can you hear the hydraulic pump motor running when you press head down?</div>";
+        }
+        return "Head dropping too fast or no feed control — this is almost always hydraulic.\n\n<div class='diag-step'><div class='diag-label'>Check 1 — Feed Rate Knob</div>Is the feed rate knob responding at all? Try turning it fully closed (counter-clockwise). Does the head slow down even slightly?</div>";
+      },
       (msg) => {
         const m = msg.toLowerCase();
         if (m.includes('no') || m.includes('nothing') || m.includes('same')) {
@@ -3898,6 +3954,17 @@ window.addEventListener('error', function(e) {
     savePricingDB(db);
     applyStoredPrices();
     showToast('✅ Prices loaded from SharePoint');
+  }
+
+  // =============================================================
+  // TOAST — was accidentally removed, adding back
+  // =============================================================
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    if (!t) return;
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2800);
   }
 
   // Hook into existing finalSubmit to also sync
