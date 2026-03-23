@@ -1718,13 +1718,23 @@ window.addEventListener('error', function(e) {
       <div class="agent-messages" id="agentMessages">
         <div class="msg agent">
           <div class="msg-avatar">🤖</div>
-          <div class="msg-bubble">Hi! I can help you identify parts, diagnose problems, or walk you through a repair across mechanical, hydraulic, or electrical systems. What are you working on?</div>
+          <div class="msg-bubble">I'm your on-site industrial expert. I can diagnose problems across <strong>mechanical, hydraulic, electrical, pneumatic, and plumbing</strong> systems — on band saws and other industrial equipment.<br><br>Describe the problem, type a symptom, or <strong>send a photo</strong> using the 📷 button and I'll help you figure it out.</div>
         </div>
       </div>
 
-      <div class="agent-input-row">
-        <input class="agent-input" id="agentInput" type="text" placeholder="Describe the problem or part..." onkeydown="if(event.key==='Enter') sendAgentMessage()">
-        <button class="btn btn-primary btn-sm" onclick="sendAgentMessage()">Send</button>
+      <div class="agent-input-row" style="flex-direction:column; gap:8px; padding:12px;">
+        <!-- Photo preview strip -->
+        <div id="agentPhotoStrip" style="display:none; gap:6px; flex-wrap:wrap;"></div>
+        <!-- Input row -->
+        <div style="display:flex; gap:8px; align-items:center; width:100%;">
+          <!-- Photo upload button -->
+          <label style="cursor:pointer; flex-shrink:0;" title="Attach photo">
+            <input type="file" accept="image/*" capture="environment" multiple onchange="handleAgentPhoto(this)" style="display:none;">
+            <div style="width:38px;height:38px;background:var(--plate);border:1px solid var(--rule);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:18px;transition:border-color 0.15s;" onmouseover="this.style.borderColor='var(--orange)'" onmouseout="this.style.borderColor='var(--rule)'">📷</div>
+          </label>
+          <input class="agent-input" id="agentInput" type="text" placeholder="Describe the problem, part, or symptom..." onkeydown="if(event.key==='Enter') sendAgentMessage()" style="flex:1;">
+          <button class="btn btn-primary btn-sm" onclick="sendAgentMessage()">Send</button>
+        </div>
       </div>
     </div>
 
@@ -1732,10 +1742,13 @@ window.addEventListener('error', function(e) {
       <div class="section-label">Quick Prompts</div>
       <div class="filter-chips">
         <button class="chip" onclick="quickPrompt('Blade not tracking straight')">Blade tracking</button>
-        <button class="chip" onclick="quickPrompt('Head feed not responding')">Head feed issue</button>
-        <button class="chip" onclick="quickPrompt('Motor not starting')">Motor won\'t start</button>
+        <button class="chip" onclick="quickPrompt('Head is not moving')">Head not moving</button>
+        <button class="chip" onclick="quickPrompt('Motor won\'t start')">Motor won't start</button>
         <button class="chip" onclick="quickPrompt('Hydraulic oil leaking')">Oil leak</button>
         <button class="chip" onclick="quickPrompt('Vise not clamping')">Vise issue</button>
+        <button class="chip" onclick="quickPrompt('Electrical problem — machine not responding to controls')">Electrical fault</button>
+        <button class="chip" onclick="quickPrompt('Strange noise or vibration')">Noise / vibration</button>
+        <button class="chip" onclick="quickPrompt('Blade keeps breaking')">Blade breaking</button>
       </div>
     </div>
 
@@ -2812,75 +2825,185 @@ window.addEventListener('error', function(e) {
     return typeof first === 'function' ? first(originalMsg) : first;
   }
 
-  function getDiagnosticReply(msg) {
-    if (!diagState.stage || diagState.stage === 'idle') {
-      return DIAG.idle(msg);
-    }
-    if (diagState.stage === 'get_symptom') {
-      return DIAG.get_symptom(msg);
-    }
-    if (diagState.stage === 'flow') {
-      const steps = diagFlows[diagState.flow];
-      if (!steps || diagState.step >= steps.length) {
-        // End of flow
-        diagState = {};
-        return "That covers the main diagnostic path for that issue. If it's still not resolved, it may need a deeper inspection or the other tech's expertise. Do you want to start a new diagnosis or add parts to the job list?";
-      }
-      const step = steps[diagState.step];
-      diagState.step++;
-      const reply = typeof step === 'function' ? step(msg) : step;
+  // =============================================================
+  // AI AGENT — powered by Claude API (real industrial expert)
+  // =============================================================
+  let agentConversation = []; // full conversation history
+  let agentPhotos = []; // pending photos to send with next message
 
-      // Check if parts were identified
-      if (diagState.partsNeeded && reply.includes('job list')) {
-        // offer to add parts
-      }
-      return reply;
-    }
-    return DIAG.idle(msg);
+  const AGENT_SYSTEM = `You are an expert industrial maintenance technician and diagnostician for Tri-County Band Saw Service — a company that services metal-cutting band saws for industrial customers across Ontario, Canada.
+
+You have deep expertise across ALL of the following trades and systems:
+- MECHANICAL: bearings, shafts, gears, belts, pulleys, couplings, alignment, lubrication, wear analysis, blade mechanics, feed systems, guide systems
+- HYDRAULIC: cylinders, pumps, valves (flow control, pressure relief, solenoid, check), hoses, fittings, seals, hydraulic oils, contamination diagnosis, pressure testing
+- ELECTRICAL/ELECTRONICS: motors (AC/DC/VFD), relays, contactors, limit switches, solenoids, PLCs, control panels, wiring, fuses, circuit breakers, sensors, encoders
+- PNEUMATIC: air cylinders, valves, regulators, FRL units, fittings, air quality
+- PLUMBING: coolant systems, coolant pumps, coolant filtration, chip conveyor systems
+- DRIVES: VFDs (Variable Frequency Drives), servo drives, gear reducers, motor sizing
+
+You service these band saw brands: Hydmech, DoAll, Behringer, Marvel, Cosen, Clausing/Startrite, Amada, W.F. Wells, HE&M, Kalamazoo, Pegas, Everising, MEP, Wellsaw.
+
+Your diagnostic approach:
+1. Ask targeted questions to narrow down the problem — don't give generic answers
+2. Work systematically: simplest checks first, then more complex
+3. When you identify parts needed, state the part name and common part numbers if known
+4. Give step-by-step repair guidance when asked
+5. If a photo is shared, analyze it carefully and identify what you see
+6. Be direct and practical — you're talking to field technicians, not engineers
+7. When parts are identified, suggest adding them to the job list
+
+When you identify specific parts needed, format them like this so the app can detect them:
+PART_NEEDED: [Part Name] | [Part Number if known] | [System: mechanical/hydraulic/electrical]
+
+Keep responses concise and actionable. The tech is on-site with a customer — they need fast, accurate answers.`;
+
+  function handleAgentPhoto(input) {
+    const files = Array.from(input.files).slice(0, 4 - agentPhotos.length);
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        agentPhotos.push({ dataUrl: e.target.result, mimeType: file.type });
+        renderAgentPhotoStrip();
+      };
+      reader.readAsDataURL(file);
+    });
+    input.value = '';
   }
 
-  // --- AGENT SEND ---
-  function sendAgentMessage() {
+  function renderAgentPhotoStrip() {
+    const strip = document.getElementById('agentPhotoStrip');
+    if (!strip) return;
+    if (!agentPhotos.length) { strip.style.display = 'none'; return; }
+    strip.style.display = 'flex';
+    strip.innerHTML = agentPhotos.map((p,i) => `
+      <div style="position:relative;width:54px;height:54px;border-radius:3px;overflow:hidden;border:1px solid var(--orange);">
+        <img src="${p.dataUrl}" style="width:100%;height:100%;object-fit:cover;">
+        <button onclick="agentPhotos.splice(${i},1);renderAgentPhotoStrip()"
+          style="position:absolute;top:1px;right:1px;background:rgba(0,0,0,0.8);border:none;color:white;border-radius:50%;width:16px;height:16px;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">×</button>
+      </div>
+    `).join('');
+  }
+
+  async function sendAgentMessage() {
     const input = document.getElementById('agentInput');
     const text = input.value.trim();
-    if (!text) return;
-    appendMessage('user', text);
+    const photos = [...agentPhotos];
+
+    if (!text && !photos.length) return;
+
+    // Show user message
+    if (photos.length) {
+      const photoHtml = photos.map(p => `<img src="${p.dataUrl}" style="max-width:120px;max-height:90px;border-radius:3px;display:block;margin-top:6px;">`).join('');
+      appendMessage('user', (text || 'Photo attached') + photoHtml);
+    } else {
+      appendMessage('user', text);
+    }
+
     input.value = '';
+    agentPhotos = [];
+    renderAgentPhotoStrip();
+
+    // Build message for API
+    let userContent = [];
+
+    // Add photos first
+    photos.forEach(p => {
+      userContent.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: p.mimeType,
+          data: p.dataUrl.split(',')[1]
+        }
+      });
+    });
+
+    // Add text
+    if (text) {
+      // Include current job context
+      const brand = document.getElementById('sawBrand')?.value || '';
+      const model = document.getElementById('sawModel')?.value || '';
+      const context = brand ? `[Context: Working on ${brand} ${model}] ` : '';
+      userContent.push({ type: 'text', text: context + text });
+    } else if (photos.length) {
+      userContent.push({ type: 'text', text: 'What can you see in this photo? Can you identify the part or problem?' });
+    }
+
+    // Add to conversation history
+    agentConversation.push({ role: 'user', content: userContent });
 
     // Show typing indicator
     const container = document.getElementById('agentMessages');
     const typing = document.createElement('div');
-    typing.className = 'msg agent'; typing.id = 'typing';
+    typing.className = 'msg agent'; typing.id = 'agentTyping';
     typing.innerHTML = `<div class="msg-avatar">🤖</div><div class="msg-bubble"><div class="loading-dots"><span></span><span></span><span></span></div></div>`;
     container.appendChild(typing);
     container.scrollTop = container.scrollHeight;
 
-    setTimeout(() => {
-      typing.remove();
-      const reply = getDiagnosticReply(text);
-      appendMessage('agent', reply);
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          system: AGENT_SYSTEM,
+          messages: agentConversation
+        })
+      });
 
-      // Auto-offer parts if identified
-      if (diagState.partsNeeded && diagState.partsNeeded.length) {
-        setTimeout(() => {
-          const parts = diagState.partsNeeded.filter(Boolean);
-          if (parts.length) {
-            const offerDiv = document.createElement('div');
-            offerDiv.className = 'msg agent';
-            offerDiv.innerHTML = `<div class="msg-avatar">🤖</div><div class="msg-bubble" style="padding:0; overflow:hidden; background:transparent; border:none;">
-              ${parts.map(p => `<div style="background:var(--plate);border:1px solid var(--orange);border-radius:4px;padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px;">
-                <div style="flex:1"><div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;text-transform:uppercase;color:var(--white)">${p.name}</div><div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--orange)">${p.partNum}</div></div>
-                <div style="font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--yellow);margin-right:8px">${p.price}</div>
-                <button onclick="addToJobList({partNum:'${p.partNum}',name:'${p.name}',meta:'${p.fits} · ${p.system}',price:'${p.price}'}); this.textContent='✓ Added'; this.disabled=true;" style="background:var(--orange);border:none;color:var(--black);font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;padding:6px 12px;border-radius:2px;cursor:pointer;">+ Add</button>
-              </div>`).join('')}
-            </div></div>`;
-            container.appendChild(offerDiv);
-            container.scrollTop = container.scrollHeight;
-            diagState.partsNeeded = null;
-          }
-        }, 400);
+      const data = await response.json();
+      typing.remove();
+
+      if (!data.content || !data.content[0]) {
+        appendMessage('agent', 'Sorry, I had trouble responding. Please try again.');
+        return;
       }
-    }, 900);
+
+      const replyText = data.content[0].text;
+
+      // Add assistant reply to history
+      agentConversation.push({ role: 'assistant', content: replyText });
+
+      // Render reply — convert markdown-style formatting
+      const formatted = replyText
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n\n/g, '<br><br>')
+        .replace(/\n/g, '<br>')
+        .replace(/^- /gm, '• ');
+
+      appendMessage('agent', formatted);
+
+      // Detect PART_NEEDED lines and offer to add to job list
+      const partMatches = [...replyText.matchAll(/PART_NEEDED:\s*([^|]+)\|([^|]*)\|([^\n]*)/g)];
+      if (partMatches.length > 0) {
+        setTimeout(() => {
+          const offerDiv = document.createElement('div');
+          offerDiv.className = 'msg agent';
+          const partsHTML = partMatches.map(m => {
+            const name = m[1].trim();
+            const partNum = m[2].trim() || ('TBD-' + Date.now().toString().slice(-4));
+            const system = m[3].trim().toLowerCase().replace('system:', '').trim() || 'mechanical';
+            return `<div style="background:var(--plate);border:1px solid var(--orange);border-radius:4px;padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px;">
+              <div style="flex:1">
+                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;text-transform:uppercase;color:var(--white)">${name}</div>
+                <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--orange)">${partNum}</div>
+              </div>
+              <button onclick="addToJobList({partNum:'${partNum}',name:'${name}',meta:'Agent identified · ${system}',price:'Price TBD',system:'${system}',fits:'Current Job'}); this.textContent='✓ Added'; this.disabled=true;"
+                style="background:var(--orange);border:none;color:var(--black);font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;padding:6px 12px;border-radius:2px;cursor:pointer;white-space:nowrap;">+ Add to Job</button>
+            </div>`;
+          }).join('');
+          offerDiv.innerHTML = `<div class="msg-avatar">🤖</div><div class="msg-bubble" style="padding:0;background:transparent;border:none;">${partsHTML}</div>`;
+          container.appendChild(offerDiv);
+          container.scrollTop = container.scrollHeight;
+        }, 300);
+      }
+
+    } catch(e) {
+      typing.remove();
+      appendMessage('agent', 'Connection error. Please check your internet and try again.');
+      console.error('Agent API error:', e);
+    }
   }
 
   function quickPrompt(text) {
@@ -2896,11 +3019,11 @@ window.addEventListener('error', function(e) {
     quickPrompt('The part identified doesn\'t look right — can you help me identify it correctly?');
   }
 
-  function appendMessage(role, text) {
+  function appendMessage(role, html) {
     const container = document.getElementById('agentMessages');
     const div = document.createElement('div');
     div.className = 'msg ' + role;
-    div.innerHTML = `<div class="msg-avatar">${role === 'agent' ? '🤖' : '👤'}</div><div class="msg-bubble">${text}</div>`;
+    div.innerHTML = `<div class="msg-avatar">${role === 'agent' ? '🤖' : '👤'}</div><div class="msg-bubble">${html}</div>`;
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
   }
