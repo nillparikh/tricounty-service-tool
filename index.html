@@ -1340,43 +1340,14 @@ window.addEventListener('error', function(e) {
   <!-- JOB LIST PANEL -->
   <div class="panel" id="panel-joblist">
 
-    <div class="job-bar">
-      <div class="job-bar-stat">
-        <span class="stat-label">Job #</span>
-        <span class="stat-value orange" id="jobNumDisplay">TC-2026-001</span>
-      </div>
-      <div class="job-bar-divider"></div>
-      <div class="job-bar-stat">
-        <span class="stat-label">Parts</span>
-        <span class="stat-value" id="jobPartCount">0</span>
-      </div>
-      <div class="job-bar-divider"></div>
-      <div class="job-bar-stat">
-        <span class="stat-label">Parts Cost</span>
-        <span class="stat-value yellow" id="jobTotal">$0.00</span>
-      </div>
-      <div class="job-bar-actions">
-        <button class="btn btn-secondary btn-sm" onclick="clearJob()">Clear</button>
-        <button class="btn btn-primary btn-sm" onclick="openCloseout()">📤 Send to Sales</button>
-      </div>
+    <!-- ACTIVE JOBS HEADER -->
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+      <div style="font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:16px; text-transform:uppercase; letter-spacing:0.05em; color:var(--white);">Active Jobs</div>
+      <button onclick="createNewJob()" style="background:var(--orange);border:none;color:#000;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;padding:8px 16px;border-radius:3px;cursor:pointer;">+ New Job</button>
     </div>
 
-    <div class="section-label">Parts Required</div>
-
-    <div class="parts-list" id="jobPartsList">
-      <div class="empty-state" id="emptyJobState">
-        <div class="empty-icon">📋</div>
-        <div class="empty-title">No Parts Added Yet</div>
-        <div class="empty-sub">Use Part Finder to identify and add parts</div>
-      </div>
-    </div>
-
-    <div id="jobNotesSection" style="display:none; margin-top:8px;">
-      <div class="section-label">Tech Notes for Purchaser</div>
-      <div class="form-group">
-        <textarea class="form-textarea" id="purchaserNotes" rows="3" placeholder="Notes for sales team (e.g. urgency, customer contact, machine down situation)..."></textarea>
-      </div>
-    </div>
+    <!-- JOBS LIST -->
+    <div id="jobsContainer"></div>
 
     <!-- PRICING DB VIEWER -->
     <div style="margin-top:16px;">
@@ -1395,6 +1366,23 @@ window.addEventListener('error', function(e) {
       </div>
     </div>
 
+  </div>
+
+  <!-- JOB SELECTOR MODAL -->
+  <div id="jobSelectorOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:600; overflow-y:auto; padding:20px;">
+    <div style="max-width:480px; margin:0 auto;">
+      <div style="background:var(--steel); border:1px solid var(--rule); border-top:3px solid var(--orange); border-radius:4px; overflow:hidden;">
+        <div style="padding:16px 20px; border-bottom:1px solid var(--rule); display:flex; align-items:center; justify-content:space-between;">
+          <div style="font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:18px; text-transform:uppercase; color:var(--white);">Add to Which Job?</div>
+          <button onclick="closeJobSelector()" style="background:none;border:1px solid var(--rule);color:var(--dim);font-size:18px;width:32px;height:32px;border-radius:3px;cursor:pointer;">×</button>
+        </div>
+        <div style="padding:16px;">
+          <div id="jobSelectorPart" style="background:var(--plate);border:1px solid var(--orange);border-radius:3px;padding:10px 14px;margin-bottom:14px;"></div>
+          <div id="jobSelectorList"></div>
+          <button onclick="createNewJobFromSelector()" style="width:100%;margin-top:10px;background:var(--plate);border:1px dashed var(--orange);color:var(--orange);font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;padding:12px;border-radius:3px;cursor:pointer;">+ Create New Job</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- CLOSE-OUT MODAL OVERLAY -->
@@ -1709,10 +1697,14 @@ window.addEventListener('error', function(e) {
     <div class="agent-container">
       <div class="agent-header">
         <div class="agent-icon">🤖</div>
-        <div>
+        <div style="flex:1;">
           <div class="agent-name">Bandsaw Diagnostic Agent</div>
-          <div class="agent-status"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;"></span> Ready to help</div>
+          <div class="agent-status"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;margin-right:4px;"></span> <span id="agentStatusText">Ready to help · Auto-saving to Case Studies</span></div>
         </div>
+        <button onclick="startNewAgentSession()" title="Start a new diagnostic session"
+          style="background:var(--plate);border:1px solid var(--rule);color:var(--dim);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;padding:6px 10px;border-radius:2px;cursor:pointer;white-space:nowrap;">
+          + New Session
+        </button>
       </div>
 
       <div class="agent-messages" id="agentMessages">
@@ -1732,7 +1724,10 @@ window.addEventListener('error', function(e) {
             <input type="file" accept="image/*" capture="environment" multiple onchange="handleAgentPhoto(this)" style="display:none;">
             <div style="width:38px;height:38px;background:var(--plate);border:1px solid var(--rule);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:18px;transition:border-color 0.15s;" onmouseover="this.style.borderColor='var(--orange)'" onmouseout="this.style.borderColor='var(--rule)'">📷</div>
           </label>
-          <input class="agent-input" id="agentInput" type="text" placeholder="Describe the problem, part, or symptom..." onkeydown="if(event.key==='Enter') sendAgentMessage()" style="flex:1;">
+          <textarea class="agent-input" id="agentInput" placeholder="Describe the problem, part, or symptom... (Shift+Enter for new line)"
+            onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); sendAgentMessage(); }"
+            style="flex:1; resize:none; height:42px; min-height:42px; max-height:120px; overflow-y:auto; line-height:1.4; padding:10px 12px;"
+            oninput="this.style.height='42px'; this.style.height=Math.min(this.scrollHeight,120)+'px';"></textarea>
           <button class="btn btn-primary btn-sm" onclick="sendAgentMessage()">Send</button>
         </div>
       </div>
@@ -1759,13 +1754,13 @@ window.addEventListener('error', function(e) {
     <div style="max-width:600px; margin:0 auto;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
         <div style="font-family:'Barlow Condensed',sans-serif; font-weight:800; font-size:16px; text-transform:uppercase; letter-spacing:0.05em; color:var(--white);" id="exportTitle">Export Preview</div>
-        <div style="display:flex; gap:8px; align-items:center;">
-          <button onclick="copyExportText()" style="background:var(--plate); border:1px solid var(--rule); color:var(--light); font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; padding:8px 14px; border-radius:3px; cursor:pointer;">📋 Copy</button>
-          <button onclick="closeExport()" style="background:var(--orange); border:none; color:var(--black); font-family:'Barlow Condensed',sans-serif; font-weight:800; font-size:13px; letter-spacing:0.08em; text-transform:uppercase; padding:8px 18px; border-radius:3px; cursor:pointer;">✕ Close</button>
-        </div>
+        <button onclick="closeExport()" style="background:var(--orange); border:none; color:var(--black); font-family:'Barlow Condensed',sans-serif; font-weight:800; font-size:13px; letter-spacing:0.08em; text-transform:uppercase; padding:8px 18px; border-radius:3px; cursor:pointer;">✕ Close</button>
       </div>
-      <div style="background:var(--steel);border:1px solid var(--rule);border-radius:4px;padding:10px 14px;margin-bottom:10px;font-size:12px;color:var(--dim);">
-        💡 Use <strong style="color:var(--light)">📋 Copy</strong> to copy this content, then paste into Word, email, or your quoting system.
+      <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+        <button onclick="copyExportText()" style="background:var(--plate); border:1px solid var(--rule); color:var(--light); font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; padding:8px 14px; border-radius:3px; cursor:pointer;">📋 Copy</button>
+        <button onclick="downloadExport()" style="background:var(--plate); border:1px solid var(--rule); color:var(--light); font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; padding:8px 14px; border-radius:3px; cursor:pointer;">⬇ Download</button>
+        <button onclick="printExport()" style="background:var(--plate); border:1px solid var(--rule); color:var(--light); font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; padding:8px 14px; border-radius:3px; cursor:pointer;">🖨 Print / PDF</button>
+        <button onclick="shareExport()" id="shareExportBtn" style="background:var(--plate); border:1px solid var(--rule); color:var(--light); font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; padding:8px 14px; border-radius:3px; cursor:pointer;">📤 Share</button>
       </div>
       <div id="exportContent" style="background:white; border-radius:4px; padding:24px; color:#1a1a1a; font-family:Arial,sans-serif; font-size:13px; line-height:1.7;"></div>
       <button onclick="closeExport()" style="width:100%;margin-top:12px;background:var(--plate);border:1px solid var(--rule);color:var(--light);font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:14px;letter-spacing:0.1em;text-transform:uppercase;padding:14px;border-radius:3px;cursor:pointer;">← Back</button>
@@ -1936,7 +1931,250 @@ window.addEventListener('error', function(e) {
 
 <script>
   // --- STATE ---
+  // =============================================================
+  // MULTI-JOB MANAGEMENT
+  // =============================================================
+  let jobs = []; // array of job objects
+  let pendingPartForJob = null; // part waiting to be assigned to a job
+
+  function genJobNum() {
+    const now = new Date();
+    const yr = now.getFullYear();
+    const seq = String(jobs.length + 1).padStart(3, '0');
+    return `TC-${yr}-${seq}`;
+  }
+
+  function createNewJob(prefill) {
+    const job = {
+      id: Date.now(),
+      jobNum: genJobNum(),
+      customer: prefill?.customer || '',
+      sawBrand: prefill?.sawBrand || document.getElementById('sawBrand')?.value || '',
+      sawModel: prefill?.sawModel || document.getElementById('sawModel')?.value || '',
+      parts: [],
+      notes: '',
+      createdAt: new Date().toISOString(),
+      status: 'active'
+    };
+    jobs.push(job);
+    renderJobs();
+    updateJobBadge();
+    showToast('✅ New job created: ' + job.jobNum);
+    return job;
+  }
+
+  function renderJobs() {
+    const container = document.getElementById('jobsContainer');
+    if (!container) return;
+
+    if (jobs.length === 0) {
+      container.innerHTML = `
+        <div style="text-align:center;padding:40px 20px;color:var(--dim);">
+          <div style="font-size:40px;margin-bottom:12px;">📋</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:18px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">No Active Jobs</div>
+          <div style="font-size:13px;margin-bottom:16px;">Create a new job to start adding parts</div>
+          <button onclick="createNewJob()" style="background:var(--orange);border:none;color:#000;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;padding:10px 24px;border-radius:3px;cursor:pointer;">+ Create First Job</button>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = jobs.map(job => {
+      const total = job.parts.reduce((sum, p) => {
+        const n = parseFloat((p.price || '0').replace(/[^0-9.]/g, '')) || 0;
+        return sum + n * (p.qty || 1);
+      }, 0);
+      const partsCount = job.parts.length;
+
+      return `
+      <div style="background:var(--steel);border:1px solid var(--rule);border-left:3px solid var(--orange);border-radius:4px;margin-bottom:12px;overflow:hidden;">
+        <!-- Job Header -->
+        <div style="padding:12px 16px;border-bottom:1px solid var(--rule);display:flex;align-items:center;gap:10px;">
+          <div style="flex:1;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span style="font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--orange);font-weight:700;">${job.jobNum}</span>
+              ${job.customer ? `<span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;color:var(--white);">${job.customer}</span>` : `<span style="font-size:12px;color:var(--dim);">No customer yet</span>`}
+            </div>
+            <div style="font-size:11px;color:var(--dim);margin-top:2px;">
+              ${job.sawBrand || job.sawModel ? `${job.sawBrand} ${job.sawModel}` : 'Saw not selected'}
+              · ${partsCount} part${partsCount !== 1 ? 's' : ''}
+              · <span style="color:var(--yellow);">$${total.toFixed(2)}</span>
+            </div>
+          </div>
+          <button onclick="openJobDetail(${job.id})" style="background:var(--orange);border:none;color:#000;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;padding:6px 14px;border-radius:2px;cursor:pointer;white-space:nowrap;">Open →</button>
+        </div>
+
+        <!-- Job Info Row -->
+        <div style="padding:10px 16px;display:flex;gap:8px;flex-wrap:wrap;">
+          <input placeholder="Customer name" value="${job.customer}"
+            oninput="updateJobField(${job.id},'customer',this.value)"
+            style="flex:1;min-width:120px;background:var(--iron);border:1px solid var(--rule);color:var(--white);font-family:'Barlow',sans-serif;font-size:12px;padding:6px 10px;border-radius:3px;">
+          <select onchange="updateJobField(${job.id},'sawBrand',this.value)"
+            style="background:var(--iron);border:1px solid var(--rule);color:var(--white);font-family:'Barlow',sans-serif;font-size:12px;padding:6px 8px;border-radius:3px;">
+            <option value="">— Brand —</option>
+            ${['Hydmech','DoAll','Behringer','Marvel','Cosen','Clausing / Startrite','Amada','W.F. Wells','HE&M','Kalamazoo','Pegas','Everising','MEP','Wellsaw'].map(b => `<option ${job.sawBrand===b?'selected':''}>${b}</option>`).join('')}
+          </select>
+          <input placeholder="Model" value="${job.sawModel}"
+            oninput="updateJobField(${job.id},'sawModel',this.value)"
+            style="width:90px;background:var(--iron);border:1px solid var(--rule);color:var(--white);font-family:'Barlow',sans-serif;font-size:12px;padding:6px 10px;border-radius:3px;">
+        </div>
+
+        <!-- Parts preview -->
+        ${partsCount > 0 ? `
+        <div style="padding:0 16px 10px;">
+          ${job.parts.slice(0,3).map(p => `
+            <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-top:1px solid var(--rule);">
+              <span style="flex:1;font-size:12px;color:var(--light);">${p.name}</span>
+              <span style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--dim);">×${p.qty}</span>
+              <span style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--yellow);">${p.price || 'TBD'}</span>
+              <button onclick="removePartFromJob(${job.id},${p.id})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;padding:0 4px;">🗑</button>
+            </div>`).join('')}
+          ${partsCount > 3 ? `<div style="font-size:11px;color:var(--dim);padding-top:4px;">+${partsCount-3} more parts...</div>` : ''}
+        </div>` : ''}
+
+        <!-- Job Actions -->
+        <div style="padding:10px 16px;border-top:1px solid var(--rule);display:flex;gap:8px;">
+          <button onclick="addPartToJob(${job.id})" style="background:var(--plate);border:1px solid var(--rule);color:var(--light);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;padding:6px 12px;border-radius:2px;cursor:pointer;">+ Add Part</button>
+          <button onclick="openCloseoutForJob(${job.id})" style="background:var(--orange);border:none;color:#000;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;padding:6px 14px;border-radius:2px;cursor:pointer;margin-left:auto;">📤 Submit</button>
+          <button onclick="deleteJob(${job.id})" style="background:none;border:1px solid var(--rule);color:var(--dim);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;padding:6px 10px;border-radius:2px;cursor:pointer;">🗑</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function updateJobField(jobId, field, value) {
+    const job = jobs.find(j => j.id === jobId);
+    if (job) { job[field] = value; renderJobs(); }
+  }
+
+  function updateJobBadge() {
+    const badge = document.getElementById('jobBadge');
+    if (badge) badge.textContent = jobs.reduce((sum, j) => sum + j.parts.length, 0);
+  }
+
+  function deleteJob(jobId) {
+    if (!confirm('Delete this job?')) return;
+    jobs = jobs.filter(j => j.id !== jobId);
+    renderJobs();
+    updateJobBadge();
+    showToast('Job deleted');
+  }
+
+  function removePartFromJob(jobId, partId) {
+    const job = jobs.find(j => j.id === jobId);
+    if (job) {
+      job.parts = job.parts.filter(p => p.id !== partId);
+      renderJobs();
+      updateJobBadge();
+      showToast('Part removed');
+    }
+  }
+
+  function openJobDetail(jobId) {
+    const job = jobs.find(j => j.id === jobId);
+    if (job) openCloseoutForJob(jobId);
+  }
+
+  function addPartToJob(jobId) {
+    // Switch to Part Finder tab
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-tab')[0].classList.add('active');
+    document.getElementById('panel-finder').classList.add('active');
+    // Store target job
+    window._targetJobId = jobId;
+    showToast('Find a part to add to this job');
+  }
+
+  // --- JOB SELECTOR (when adding part from Part Finder) ---
+  function showJobSelector(part) {
+    pendingPartForJob = part;
+
+    if (jobs.length === 0) {
+      // No jobs — create one automatically
+      const job = createNewJob();
+      assignPartToJob(job.id, part);
+      return;
+    }
+
+    if (jobs.length === 1) {
+      // Only one job — add directly
+      assignPartToJob(jobs[0].id, part);
+      return;
+    }
+
+    if (window._targetJobId) {
+      // Coming from "Add Part" button on a specific job
+      assignPartToJob(window._targetJobId, part);
+      window._targetJobId = null;
+      return;
+    }
+
+    // Multiple jobs — show selector
+    document.getElementById('jobSelectorPart').innerHTML = `
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;text-transform:uppercase;color:var(--white);">${part.name}</div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--orange);">${part.partNum}</div>`;
+
+    document.getElementById('jobSelectorList').innerHTML = jobs.map(job => `
+      <div onclick="assignPartToJob(${job.id}, pendingPartForJob); closeJobSelector();"
+        style="background:var(--plate);border:1px solid var(--rule);border-radius:3px;padding:12px 16px;margin-bottom:8px;cursor:pointer;transition:border-color 0.15s;"
+        onmouseover="this.style.borderColor='var(--orange)'" onmouseout="this.style.borderColor='var(--rule)'">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--orange);">${job.jobNum}</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--white);">${job.customer || 'No customer yet'} ${job.sawBrand ? '· ' + job.sawBrand : ''} ${job.sawModel || ''}</div>
+        <div style="font-size:11px;color:var(--dim);">${job.parts.length} parts</div>
+      </div>`).join('');
+
+    document.getElementById('jobSelectorOverlay').style.display = 'block';
+  }
+
+  function closeJobSelector() {
+    document.getElementById('jobSelectorOverlay').style.display = 'none';
+    pendingPartForJob = null;
+  }
+
+  function createNewJobFromSelector() {
+    const part = pendingPartForJob;
+    closeJobSelector();
+    const job = createNewJob();
+    if (part) assignPartToJob(job.id, part);
+  }
+
+  function assignPartToJob(jobId, part) {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job || !part) return;
+    const pricingDB = loadPricingDB();
+    if (pricingDB[part.partNum]) part.price = pricingDB[part.partNum];
+    job.parts.push({ ...part, qty: 1, id: Date.now() });
+    renderJobs();
+    updateJobBadge();
+    // Switch to job list tab
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-tab')[1].classList.add('active');
+    document.getElementById('panel-joblist').classList.add('active');
+    showToast('✅ ' + part.name + ' added to ' + job.jobNum);
+  }
+
+  function openCloseoutForJob(jobId) {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    // Store active job for closeout
+    window._closeoutJobId = jobId;
+    // Pre-fill closeout fields
+    const customerEl = document.getElementById('co-customer');
+    if (customerEl) customerEl.value = job.customer || '';
+    // Set job items for the closeout process
+    jobItems = job.parts;
+    openCloseout();
+  }
+
+  // Keep jobItems as alias for backward compat with closeout
   let jobItems = [];
+
+  function updateJobList() { renderJobs(); updateJobBadge(); }
+  function clearJob() {
+    if (!jobs.length) return;
+    if (confirm('Clear all jobs?')) { jobs = []; renderJobs(); updateJobBadge(); }
+  }
   let currentResult = null;
   let diagState = {}; // tracks diagnostic conversation context
 
@@ -1975,10 +2213,16 @@ window.addEventListener('error', function(e) {
     { partNum: 'CHM-ESTOP-S20',  name: 'Emergency Stop Button',                system: 'electrical', price: '$28.00',  fits: 'Universal' },
     { partNum: 'CHM-POT-S20',    name: 'Linear Potentiometer (RHLS/FHLS)',     system: 'electrical', price: '$185.00', fits: 'Hydmech S-20P' },
     { partNum: 'CHM-CTRL-S20P',  name: 'Control Board S-20P',                  system: 'electrical', price: '$895.00', fits: 'Hydmech S-20P' },
-    // ── HYDMECH H-SERIES — horizontal guillotine ──────────────────────────
-    { partNum: 'CHM-VISECYL-H',  name: 'Vise Cylinder — H-Series',             system: 'hydraulic',  price: '$265.00', fits: 'Hydmech H-Series' },
-    { partNum: 'CHM-HEADCYL-H',  name: 'Head Cylinder — H-Series',             system: 'hydraulic',  price: '$310.00', fits: 'Hydmech H-Series' },
-    { partNum: 'CHM-SHUTTLE-H',  name: 'Shuttle Vise Assembly',                system: 'mechanical', price: '$445.00', fits: 'Hydmech H-14A / H-16A' },
+    // ── HYDMECH H-26 / H-42 SERIES — specific parts ──────────────────────
+    { partNum: 'TZ-8112',       name: 'Head Down Lower Limit Switch',         system: 'electrical', price: 'Price TBD', fits: 'Hydmech H-26 / H-42' },
+    { partNum: 'TZ-8111',       name: 'Head Up Upper Limit Switch',           system: 'electrical', price: 'Price TBD', fits: 'Hydmech H-26 / H-42' },
+    { partNum: 'TZ-8110',       name: 'Vise Open Limit Switch',               system: 'electrical', price: 'Price TBD', fits: 'Hydmech H-26 / H-42' },
+    { partNum: 'CHM-HEADCYL-26',name: 'Head Cylinder — H-26',                 system: 'hydraulic',  price: 'Price TBD', fits: 'Hydmech H-26 / H-42' },
+    { partNum: 'CHM-VISECYL-26',name: 'Vise Cylinder — H-26',                 system: 'hydraulic',  price: 'Price TBD', fits: 'Hydmech H-26 / H-42' },
+    { partNum: 'CHM-SEAL-26',   name: 'Head Cylinder Seal Kit — H-26',        system: 'hydraulic',  price: 'Price TBD', fits: 'Hydmech H-26 / H-42' },
+    { partNum: 'CHM-GUIDE-26',  name: 'Blade Guide Block Set — H-26',         system: 'mechanical', price: 'Price TBD', fits: 'Hydmech H-26 / H-42' },
+    { partNum: 'CHM-BRUSH-26',  name: 'Blade Cleaning Brush — H-26',          system: 'mechanical', price: 'Price TBD', fits: 'Hydmech H-26 / H-42' },
+    { partNum: 'CHM-FCV-26',    name: 'Feed Control Valve — H-26',            system: 'hydraulic',  price: 'Price TBD', fits: 'Hydmech H-26 / H-42' },
     // ── DOALL C-916 SERIES — from parts catalog / field experience ─────────
     { partNum: 'DA-604242',      name: 'Blade Guide — RH Fixed (1" blade)',    system: 'mechanical', price: '$72.00',  fits: 'DoAll C-916 Series' },
     { partNum: 'DA-604243',      name: 'Blade Guide — LH Fixed (1" blade)',    system: 'mechanical', price: '$72.00',  fits: 'DoAll C-916 Series' },
@@ -2042,10 +2286,189 @@ window.addEventListener('error', function(e) {
     { partNum: 'UNV-ESTOP',      name: 'Emergency Stop Button 40mm',            system: 'electrical', price: '$28.00',  fits: 'Universal' },
     { partNum: 'UNV-VFD-3HP',    name: 'Variable Frequency Drive 3HP',          system: 'electrical', price: '$385.00', fits: 'Universal' },
     { partNum: 'UNV-VFD-5HP',    name: 'Variable Frequency Drive 5HP',          system: 'electrical', price: '$445.00', fits: 'Universal' },
+    { partNum: 'UNV-VFD-10HP',   name: 'Variable Frequency Drive 10HP',         system: 'electrical', price: '$620.00', fits: 'Universal' },
+    { partNum: 'UNV-VFD-20HP',   name: 'Variable Frequency Drive 20HP',         system: 'electrical', price: '$945.00', fits: 'Universal' },
     { partNum: 'UNV-BLADE-1',    name: 'Bi-Metal Blade 1" (various lengths)',   system: 'mechanical', price: '$48.00',  fits: 'Universal 1" blade saws' },
     { partNum: 'UNV-BLADE-125',  name: 'Bi-Metal Blade 1-1/4" (various)',      system: 'mechanical', price: '$68.00',  fits: 'Universal 1-1/4" blade saws' },
+    { partNum: 'UNV-BLADE-150',  name: 'Bi-Metal Blade 1-1/2" (various)',      system: 'mechanical', price: '$78.00',  fits: 'Universal 1-1/2" blade saws' },
+    { partNum: 'UNV-BLADE-200',  name: 'Bi-Metal Blade 2" (various lengths)',   system: 'mechanical', price: '$98.00',  fits: 'Universal 2" blade saws' },
+    { partNum: 'UNV-BLADE-263',  name: 'Bi-Metal Blade 2-5/8" (various)',      system: 'mechanical', price: '$128.00', fits: 'Universal 2-5/8" blade saws' },
     { partNum: 'UNV-WBRUSH',     name: 'Wire Wheel Brush',                      system: 'mechanical', price: '$18.00',  fits: 'Universal' },
+    { partNum: 'UNV-BEARING-STD',name: 'Band Wheel Bearing (standard)',         system: 'mechanical', price: '$28.00',  fits: 'Universal' },
+    { partNum: 'UNV-BELT-V',     name: 'V-Belt Drive Belt',                     system: 'mechanical', price: '$24.00',  fits: 'Universal' },
+    { partNum: 'UNV-GEARBOX',    name: 'Worm Gearbox Assembly',                 system: 'mechanical', price: '$445.00', fits: 'Universal' },
+    { partNum: 'UNV-ENCODER',    name: 'Encoder — Shuttle/Index Position',      system: 'electrical', price: '$185.00', fits: 'Universal automatic saws' },
+    { partNum: 'UNV-PLC-SIEMENS',name: 'PLC Controller — Siemens S7',          system: 'electrical', price: '$1250.00',fits: 'Universal PLC saws' },
+    { partNum: 'UNV-CONTACTOR',  name: 'Motor Contactor 3-Phase',               system: 'electrical', price: '$68.00',  fits: 'Universal' },
+    { partNum: 'UNV-OVERLOAD',   name: 'Thermal Overload Relay',                system: 'electrical', price: '$58.00',  fits: 'Universal' },
+    { partNum: 'UNV-XFORMER',    name: 'Control Transformer 240/120V',          system: 'electrical', price: '$145.00', fits: 'Universal' },
+    { partNum: 'UNV-PROX-NPN',   name: 'Proximity Switch NPN 12-24VDC',        system: 'electrical', price: '$68.00',  fits: 'Universal' },
+    { partNum: 'UNV-PROX-PNP',   name: 'Proximity Switch PNP 12-24VDC',        system: 'electrical', price: '$68.00',  fits: 'Universal' },
+    { partNum: 'UNV-HYD-PUMP',   name: 'Hydraulic Pump (gear type)',            system: 'hydraulic',  price: '$385.00', fits: 'Universal' },
+    { partNum: 'UNV-HYD-MOTOR',  name: 'Hydraulic Pump Motor 1HP',              system: 'hydraulic',  price: '$285.00', fits: 'Universal' },
+    { partNum: 'UNV-RELIEF-VLV', name: 'Pressure Relief Valve',                 system: 'hydraulic',  price: '$98.00',  fits: 'Universal' },
+    { partNum: 'UNV-DIR-VLV',    name: 'Directional Control Valve 4/3',        system: 'hydraulic',  price: '$145.00', fits: 'Universal' },
+    { partNum: 'UNV-CHECK-VLV',  name: 'Check Valve (hydraulic)',               system: 'hydraulic',  price: '$42.00',  fits: 'Universal' },
+    { partNum: 'UNV-HYD-FILT',   name: 'Return Line Hydraulic Filter',          system: 'hydraulic',  price: '$52.00',  fits: 'Universal' },
+    { partNum: 'UNV-COOL-PUMP',  name: 'Coolant Pump 1/8HP',                   system: 'mechanical', price: '$128.00', fits: 'Universal' },
+    { partNum: 'UNV-COOL-FILT',  name: 'Coolant Filter Element',               system: 'mechanical', price: '$18.00',  fits: 'Universal' },
+
+    // ── HYDMECH H-26/42 — large guillotine series ─────────────────────────
+    { partNum: 'TZ-8112',        name: 'Head Down Lower Limit Switch',          system: 'electrical', price: 'Price TBD', fits: 'Hydmech H-26/42' },
+    { partNum: 'TZ-8111',        name: 'Head Up Upper Limit Switch',            system: 'electrical', price: 'Price TBD', fits: 'Hydmech H-26/42' },
+    { partNum: 'TZ-8110',        name: 'Vise Open Limit Switch',                system: 'electrical', price: 'Price TBD', fits: 'Hydmech H-26/42' },
+    { partNum: 'TZ-8113',        name: 'Vise Close Limit Switch',               system: 'electrical', price: 'Price TBD', fits: 'Hydmech H-26/42' },
+    { partNum: 'CHM-HEADCYL-26', name: 'Head Cylinder — H-26/42',              system: 'hydraulic',  price: 'Price TBD', fits: 'Hydmech H-26/42' },
+    { partNum: 'CHM-VISECYL-26', name: 'Vise Cylinder — H-26/42',              system: 'hydraulic',  price: 'Price TBD', fits: 'Hydmech H-26/42' },
+    { partNum: 'CHM-SEAL-26',    name: 'Head Cylinder Seal Kit — H-26/42',     system: 'hydraulic',  price: 'Price TBD', fits: 'Hydmech H-26/42' },
+    { partNum: 'CHM-GUIDE-26',   name: 'Blade Guide Block Set — H-26/42',      system: 'mechanical', price: 'Price TBD', fits: 'Hydmech H-26/42' },
+    { partNum: 'CHM-BRUSH-26',   name: 'Blade Cleaning Brush — H-26/42',       system: 'mechanical', price: 'Price TBD', fits: 'Hydmech H-26/42' },
+    { partNum: 'CHM-FCV-26',     name: 'Feed Control Valve — H-26/42',         system: 'hydraulic',  price: 'Price TBD', fits: 'Hydmech H-26/42' },
+    { partNum: 'P HYD 022.1245', name: 'E-Stop Switch',                         system: 'electrical', price: '$103.00', fits: 'Hydmech (various)' },
+    { partNum: 'P HYD 022.1288', name: 'Main Switch — DM-10',                  system: 'electrical', price: '$184.00', fits: 'Hydmech DM-10' },
+    { partNum: 'P HYD 022.1811', name: 'Linear Potentiometer (RHLS/FHLS)',     system: 'electrical', price: '$1103.00',fits: 'Hydmech S-20P / S-23P' },
+    { partNum: 'P HYD 022.1816', name: 'Potentiometer 10K',                    system: 'electrical', price: '$101.00', fits: 'Hydmech (various)' },
+    { partNum: 'P HYD 022.2834', name: 'Controller MEP 50 V1.0',               system: 'electrical', price: '$5393.00',fits: 'Hydmech H-14A' },
+
+    // ── HYDMECH BLADE GUIDE PART NUMBERS (OEM cross-reference) ───────────
+    { partNum: 'CRB-100-22-00',  name: 'Carbide Blade Guide Set 1.00"',        system: 'mechanical', price: '$298.00', fits: 'Hydmech (1" blade)' },
+    { partNum: 'CRB-125-22-00',  name: 'Carbide Blade Guide Set 1-1/4"',      system: 'mechanical', price: '$336.00', fits: 'Hydmech (1-1/4" blade)' },
+    { partNum: 'CRB-150-22-00A', name: 'Carbide Blade Guide Set 1-1/2"',      system: 'mechanical', price: '$365.00', fits: 'Hydmech (1-1/2" blade)' },
+    { partNum: 'CRB-200-22-00',  name: 'Carbide Blade Guide Set 2"',          system: 'mechanical', price: '$410.00', fits: 'Hydmech (2" blade)' },
+    { partNum: '342315',          name: 'Chip Brush Assembly',                  system: 'mechanical', price: '$13.00',  fits: 'Hydmech (various)' },
+    { partNum: '340790',          name: 'Pressure Block / Backup Guide',        system: 'mechanical', price: '$19.89',  fits: 'Hydmech (various)' },
+    { partNum: '394270',          name: 'Cylinder Seal Kit 2"',                system: 'hydraulic',  price: '$65.00',  fits: 'Hydmech (various)' },
+    { partNum: '800721',          name: 'Blade Guide 1-1/4"',                  system: 'mechanical', price: 'Price TBD', fits: 'Hydmech (1-1/4" blade)' },
+
+    // ── HE&M / HEM SERIES ──────────────────────────────────────────────────
+    { partNum: 'HEM-GUIDE-125',  name: 'Carbide Side Guide Set 1-1/4" blade', system: 'mechanical', price: 'Price TBD', fits: 'HE&M (1-1/4" blade)' },
+    { partNum: 'HEM-GUIDE-100',  name: 'Carbide Side Guide Set 1" blade',     system: 'mechanical', price: 'Price TBD', fits: 'HE&M (1" blade)' },
+    { partNum: 'HEM-BRUSH-STD',  name: 'Blade Chip Brush',                    system: 'mechanical', price: 'Price TBD', fits: 'HE&M (various)' },
+    { partNum: 'HEM-SEAL-STD',   name: 'Head Cylinder Seal Kit',              system: 'hydraulic',  price: 'Price TBD', fits: 'HE&M (various)' },
+    { partNum: 'HEM-BELT-STD',   name: 'Drive Belt',                          system: 'mechanical', price: 'Price TBD', fits: 'HE&M (various)' },
+    { partNum: 'HEM-LS-STD',     name: 'Limit Switch',                        system: 'electrical', price: 'Price TBD', fits: 'HE&M (various)' },
+    { partNum: 'HEM-WHEEL-125',  name: 'Band Wheel 1-1/4" blade',             system: 'mechanical', price: 'Price TBD', fits: 'HE&M V100 / H101 series' },
+    { partNum: 'HEM-COOL-STD',   name: 'Coolant Pump',                        system: 'mechanical', price: 'Price TBD', fits: 'HE&M (various)' },
+
+    // ── KALAMAZOO BAND SAWS ───────────────────────────────────────────────
+    { partNum: 'KAL-GUIDE-STD',  name: 'Blade Guide Set',                     system: 'mechanical', price: 'Price TBD', fits: 'Kalamazoo (various)' },
+    { partNum: 'KAL-BRUSH-STD',  name: 'Blade Chip Brush',                    system: 'mechanical', price: 'Price TBD', fits: 'Kalamazoo (various)' },
+    { partNum: 'KAL-SEAL-STD',   name: 'Cylinder Seal Kit',                   system: 'hydraulic',  price: 'Price TBD', fits: 'Kalamazoo hydraulic models' },
+    { partNum: 'KAL-MOTOR-STD',  name: 'Blade Drive Motor',                   system: 'electrical', price: 'Price TBD', fits: 'Kalamazoo (various)' },
+
+    // ── PEGAS BAND SAWS ────────────────────────────────────────────────────
+    { partNum: 'PEG-GUIDE-STD',  name: 'Blade Guide Set',                     system: 'mechanical', price: 'Price TBD', fits: 'Pegas (various)' },
+    { partNum: 'PEG-SEAL-STD',   name: 'Hydraulic Cylinder Seal Kit',         system: 'hydraulic',  price: 'Price TBD', fits: 'Pegas hydraulic models' },
+    { partNum: 'PEG-VFD-STD',    name: 'Variable Frequency Drive',            system: 'electrical', price: 'Price TBD', fits: 'Pegas automatic models' },
+    { partNum: 'PEG-BRUSH-STD',  name: 'Blade Cleaning Brush',                system: 'mechanical', price: 'Price TBD', fits: 'Pegas (various)' },
+
+    // ── EVERISING BAND SAWS ───────────────────────────────────────────────
+    { partNum: 'EVR-GUIDE-STD',  name: 'Blade Guide Set',                     system: 'mechanical', price: 'Price TBD', fits: 'Everising (various)' },
+    { partNum: 'EVR-SEAL-STD',   name: 'Head Cylinder Seal Kit',              system: 'hydraulic',  price: 'Price TBD', fits: 'Everising (various)' },
+    { partNum: 'EVR-BRUSH-STD',  name: 'Blade Chip Brush',                    system: 'mechanical', price: 'Price TBD', fits: 'Everising (various)' },
+    { partNum: 'EVR-FCV-STD',    name: 'Feed Control Valve',                  system: 'hydraulic',  price: 'Price TBD', fits: 'Everising (various)' },
+
+    // ── MEP BAND SAWS ──────────────────────────────────────────────────────
+    { partNum: 'MEP-GUIDE-STD',  name: 'Blade Guide Set',                     system: 'mechanical', price: 'Price TBD', fits: 'MEP (various)' },
+    { partNum: 'MEP-SEAL-STD',   name: 'Cylinder Seal Kit',                   system: 'hydraulic',  price: 'Price TBD', fits: 'MEP (various)' },
+    { partNum: 'MEP-BRUSH-STD',  name: 'Blade Cleaning Brush',                system: 'mechanical', price: 'Price TBD', fits: 'MEP (various)' },
+
+    // ── W.F. WELLS / WELLSAW ──────────────────────────────────────────────
+    { partNum: 'WFW-GUIDE-STD',  name: 'Blade Guide Set',                     system: 'mechanical', price: 'Price TBD', fits: 'W.F. Wells / Wellsaw (various)' },
+    { partNum: 'WFW-BRUSH-STD',  name: 'Blade Chip Brush',                    system: 'mechanical', price: 'Price TBD', fits: 'W.F. Wells / Wellsaw (various)' },
+    { partNum: 'WFW-SEAL-STD',   name: 'Cylinder Seal Kit',                   system: 'hydraulic',  price: 'Price TBD', fits: 'W.F. Wells / Wellsaw hydraulic' },
+    { partNum: 'WFW-MOTOR-STD',  name: 'Blade Drive Motor',                   system: 'electrical', price: 'Price TBD', fits: 'W.F. Wells / Wellsaw (various)' },
+
+    // ── CLAUSING / STARTRITE ──────────────────────────────────────────────
+    { partNum: 'CLS-GUIDE-STD',  name: 'Blade Guide Set',                     system: 'mechanical', price: 'Price TBD', fits: 'Clausing / Startrite (various)' },
+    { partNum: 'CLS-BRUSH-STD',  name: 'Blade Chip Brush',                    system: 'mechanical', price: 'Price TBD', fits: 'Clausing / Startrite (various)' },
+    { partNum: 'CLS-SEAL-STD',   name: 'Cylinder Seal Kit',                   system: 'hydraulic',  price: 'Price TBD', fits: 'Clausing / Startrite hydraulic' },
   ];
+
+  // =============================================================
+  // SMART SEARCH ENGINE — synonyms, fuzzy matching, part# lookup
+  // =============================================================
+  const PART_SYNONYMS = {
+    'limit switch': ['ls', 'switch', 'prox', 'proximity', 'sensor', 'position sensor', 'reed switch'],
+    'head down': ['lower limit', 'bottom limit', 'down limit', 'head lower', 'lower switch'],
+    'head up': ['upper limit', 'top limit', 'up limit', 'head upper', 'upper switch'],
+    'vise': ['vice', 'clamp', 'jaw', 'chuck'],
+    'blade guide': ['guide', 'guides', 'guide set', 'guide block', 'carbide guide', 'side guide', 'backup guide'],
+    'chip brush': ['brush', 'cleaning brush', 'blade brush', 'chip cleaner'],
+    'seal kit': ['seal', 'seals', 'o-ring', 'o ring', 'packing', 'cylinder seal'],
+    'hydraulic pump': ['pump', 'hyd pump', 'power unit'],
+    'flow control valve': ['fcv', 'feed valve', 'feed control', 'flow valve', 'needle valve', 'flow control'],
+    'solenoid valve': ['solenoid', 'directional valve', 'sol valve'],
+    'head cylinder': ['feed cylinder', 'down cylinder', 'bow cylinder', 'ram'],
+    'vise cylinder': ['clamp cylinder', 'jaw cylinder', 'vise cyl'],
+    'coolant pump': ['coolant', 'flood coolant', 'cutting fluid pump', 'mist pump'],
+    'variable frequency drive': ['vfd', 'inverter', 'drive', 'frequency drive', 'ac drive', 'speed drive'],
+    'motor': ['blade motor', 'drive motor', 'main motor', 'spindle motor'],
+    'relay': ['motor relay', 'contactor', 'starter'],
+    'e-stop': ['emergency stop', 'estop', 'stop button', 'mushroom button'],
+    'potentiometer': ['pot', 'linear pot', 'position sensor', 'linear potentiometer', 'rheostat'],
+    'encoder': ['rotary encoder', 'position encoder', 'index encoder', 'linear encoder'],
+    'band wheel': ['bandwheel', 'drive wheel', 'idler wheel', 'wheel'],
+    'bearing': ['ball bearing', 'roller bearing', 'wheel bearing'],
+    'belt': ['drive belt', 'v-belt', 'poly v belt', 'timing belt'],
+    'transformer': ['control transformer', 'xformer', 'step down'],
+  };
+
+  function smartSearch(query) {
+    if (!query || query.length < 1) return [];
+    const q = query.toLowerCase().trim();
+
+    // Score each part
+    const scored = partsDB.map(part => {
+      let score = 0;
+      const name = part.name.toLowerCase();
+      const num = part.partNum.toLowerCase();
+      const fits = (part.fits || '').toLowerCase();
+
+      // Exact part number match — highest priority
+      if (num === q) score += 1000;
+      else if (num.includes(q) || q.includes(num)) score += 500;
+
+      // Exact name match
+      if (name === q) score += 900;
+      // Name starts with query
+      else if (name.startsWith(q)) score += 400;
+      // Name contains full query
+      else if (name.includes(q)) score += 300;
+      // Query contains the name
+      else if (q.includes(name)) score += 200;
+
+      // Word-by-word matching
+      const queryWords = q.split(/\s+/).filter(w => w.length > 1);
+      const nameWords = name.split(/\s+/);
+      queryWords.forEach(qw => {
+        nameWords.forEach(nw => {
+          if (nw === qw) score += 80;
+          else if (nw.startsWith(qw) || qw.startsWith(nw)) score += 40;
+          else if (nw.includes(qw) || qw.includes(nw)) score += 20;
+        });
+      });
+
+      // Synonym expansion
+      Object.entries(PART_SYNONYMS).forEach(([canonical, synonyms]) => {
+        const allTerms = [canonical, ...synonyms];
+        const queryMatchesGroup = allTerms.some(t => q.includes(t) || t.includes(q));
+        const nameMatchesGroup = allTerms.some(t => name.includes(t) || t.includes(name.split(' ')[0]));
+        if (queryMatchesGroup && nameMatchesGroup) score += 150;
+      });
+
+      // Fits/brand bonus
+      if (fits.includes(q)) score += 100;
+
+      return { part, score };
+    });
+
+    return scored
+      .filter(s => s.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8)
+      .map(s => s.part);
+  }
 
   // --- TAB SWITCHING ---
   function switchTab(tab, el) {
@@ -2063,7 +2486,7 @@ window.addEventListener('error', function(e) {
       'S-20', 'S-20A', 'S-20P', 'S-23A', 'S-15', 'S-25',
       // H-Series — horizontal guillotine automatic
       'H-10A', 'H-11A', 'H-12', 'H-14A', 'H-16A', 'H-18A', 'H-20A', 'H-22A',
-      'H-26A', 'H-28A', 'H-32A', 'H-230A',
+      'H-26A', 'H-28A', 'H-32A', 'H-42A', 'H-230A',
       // M-Series — horizontal pivot miter
       'M-16A', 'M-20A', 'M-25A', 'M-30A',
       // V-Series — vertical tilt frame
@@ -2304,13 +2727,38 @@ window.addEventListener('error', function(e) {
   // --- BROWSE BY SYSTEM ---
   function renderBrowse(system) {
     const list = document.getElementById('browseList');
-    const filtered = system === 'all' ? partsDB : partsDB.filter(p => p.system === system);
+    const brand = document.getElementById('sawBrand')?.value || '';
+    const model = document.getElementById('sawModel')?.value || '';
+
+    let filtered = partsDB;
+
+    // Filter by system
+    if (system !== 'all') filtered = filtered.filter(p => p.system === system);
+
+    // Filter by brand/model if selected
+    if (brand) {
+      const brandLower = brand.toLowerCase().split(' ')[0]; // e.g. "hydmech"
+      const modelLower = model.toLowerCase();
+      filtered = filtered.filter(p => {
+        const fitsLower = (p.fits || '').toLowerCase();
+        // Show if fits universal, matches brand, or matches specific model
+        return fitsLower.includes('universal') ||
+               fitsLower.includes(brandLower) ||
+               (modelLower && fitsLower.includes(modelLower));
+      });
+    }
+
+    if (filtered.length === 0) {
+      list.innerHTML = `<div style="text-align:center;padding:20px;color:var(--dim);font-size:13px;">No parts found for ${brand || 'selected filters'}.<br>Try selecting a different brand or system.</div>`;
+      return;
+    }
+
     list.innerHTML = filtered.map(p => `
       <div class="browse-row">
         <span class="browse-sys sys-${p.system}"></span>
-        <span class="browse-name">${p.name}</span>
+        <span class="browse-name">${p.name} <span style="font-size:10px;color:var(--dim);">${p.fits}</span></span>
         <span class="browse-num">${p.partNum}</span>
-        <button class="browse-add" onclick="addToJobList({partNum:'${p.partNum}',name:'${p.name}',meta:'${p.fits} · ${p.system}',price:'${p.price}'})">+ Add</button>
+        <button class="browse-add" onclick="addToJobList({partNum:'${p.partNum}',name:'${p.name}',meta:'${p.fits} · ${p.system}',price:'${p.price}',system:'${p.system}',fits:'${p.fits}'})">+ Add</button>
       </div>
     `).join('');
   }
@@ -2337,54 +2785,67 @@ window.addEventListener('error', function(e) {
   // --- IDENTIFY PART ---
   function identifyPart() {
     const model = document.getElementById('sawModel').value;
+    const brand = document.getElementById('sawBrand').value;
     const descEl = document.getElementById('partDescription');
     const desc = descEl ? descEl.value.trim() : '';
-    const descLower = desc.toLowerCase();
 
     if (!desc && !document.getElementById('photoPreview')?.classList.contains('visible')) {
-      showToast('Enter a part name or take a photo first');
+      showToast('Enter a part name, part number, or description');
       return;
     }
 
-    // Try DB match — multiple strategies
-    let match = null;
-    if (descLower.length > 1) {
-      // Exact name match
-      match = partsDB.find(p => p.name.toLowerCase() === descLower);
-      // Contains full description
-      if (!match) match = partsDB.find(p => p.name.toLowerCase().includes(descLower));
-      // Description contains part name word
-      if (!match) match = partsDB.find(p => descLower.includes(p.name.toLowerCase()));
-      // Any word match
-      if (!match) {
-        const words = descLower.split(/\s+/).filter(w => w.length > 2);
-        match = partsDB.find(p => words.some(w => p.name.toLowerCase().includes(w)));
+    if (desc.length > 0) {
+      const results = smartSearch(desc);
+
+      if (results.length > 0) {
+        // Show top result immediately
+        showResult(results[0], 96);
+
+        // If multiple results, show alternatives below
+        if (results.length > 1) {
+          const resultDiv = document.getElementById('aiResult');
+          const existing = resultDiv.querySelector('.alt-results');
+          if (existing) existing.remove();
+
+          const altDiv = document.createElement('div');
+          altDiv.className = 'alt-results';
+          altDiv.style.cssText = 'margin-top:10px;border-top:1px solid var(--rule);padding-top:10px;';
+          altDiv.innerHTML = `<div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--dim);margin-bottom:8px;">Also found:</div>` +
+            results.slice(1, 5).map(p => `
+              <div onclick="showResult(${JSON.stringify(p).replace(/"/g,'&quot;')}, 85)"
+                style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--iron);border:1px solid var(--rule);border-radius:3px;margin-bottom:6px;cursor:pointer;transition:border-color 0.15s;"
+                onmouseover="this.style.borderColor='var(--orange)'" onmouseout="this.style.borderColor='var(--rule)'">
+                <div style="flex:1;">
+                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;color:var(--white);">${p.name}</div>
+                  <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--orange);">${p.partNum} · ${p.fits}</div>
+                </div>
+                <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--yellow);white-space:nowrap;">${p.price}</div>
+              </div>`).join('');
+          resultDiv.appendChild(altDiv);
+        }
+        return;
       }
     }
 
-    if (match) {
-      showResult(match, 94);
-      return;
-    }
-
-    // Fallback — create a TBD entry so it can still be added
+    // No match found — create TBD entry
     if (desc.length > 0) {
       const fallback = {
         partNum: 'TBD-' + Date.now().toString().slice(-4),
         name: desc.replace(/\b\w/g, c => c.toUpperCase()),
-        meta: (model || 'Selected Saw') + ' · Price TBD',
+        meta: (brand ? brand + ' ' : '') + (model || '') + ' · Price TBD',
         price: 'Price TBD',
-        fits: model || 'Unknown',
+        fits: (brand && model) ? `${brand} ${model}` : (brand || 'Unknown'),
         system: 'mechanical'
       };
-      showResult(fallback, 65);
+      showResult(fallback, 60);
+      showToast('Part not in database — added as custom entry');
     } else {
       const photoFallback = {
         partNum: 'TBD-PHOTO',
         name: 'Part from Photo',
-        meta: (model || 'Selected Saw') + ' · Price TBD',
+        meta: (brand ? brand + ' ' : '') + (model || '') + ' · Price TBD',
         price: 'Price TBD',
-        fits: model || 'Unknown',
+        fits: (brand && model) ? `${brand} ${model}` : 'Unknown',
         system: 'mechanical'
       };
       showResult(photoFallback, 70);
@@ -2414,12 +2875,9 @@ window.addEventListener('error', function(e) {
   function addToJobList(item) {
     const part = item || currentResult;
     if (!part) { showToast('No part selected'); return; }
-    // Apply confirmed price if available
     const pricingDB = loadPricingDB();
     if (pricingDB[part.partNum]) part.price = pricingDB[part.partNum];
-    jobItems.push({ ...part, qty: 1, id: Date.now() });
-    updateJobList();
-    showToast('✅ ' + part.name + ' added');
+    showJobSelector(part);
   }
 
   // =============================================================
@@ -2830,6 +3288,109 @@ window.addEventListener('error', function(e) {
   // =============================================================
   let agentConversation = []; // full conversation history
   let agentPhotos = []; // pending photos to send with next message
+  let agentSessionId = null; // current session ID for case study
+  let agentSessionPhotos = []; // all photos sent in this session
+  let agentAutoSaveTimer = null; // debounce timer for auto-save
+
+  function startNewAgentSession() {
+    agentConversation = [];
+    agentSessionId = 'DIAG-' + Date.now();
+    agentSessionPhotos = [];
+    // Clear chat UI
+    const container = document.getElementById('agentMessages');
+    container.innerHTML = `
+      <div class="msg agent">
+        <div class="msg-avatar">🤖</div>
+        <div class="msg-bubble">I'm your on-site industrial expert. I can diagnose problems across <strong>mechanical, hydraulic, electrical, pneumatic, and plumbing</strong> systems — on band saws and other industrial equipment.<br><br>Describe the problem, type a symptom, or <strong>send a photo</strong> using the 📷 button and I'll help you figure it out.</div>
+      </div>`;
+    showToast('New diagnostic session started');
+  }
+
+  // Auto-save conversation as draft case study after each exchange
+  function autoSaveConversation() {
+    if (agentConversation.length < 2) return; // need at least one exchange
+
+    // Extract useful info from conversation
+    const firstUserMsg = agentConversation.find(m => m.role === 'user');
+    const firstText = firstUserMsg ?
+      (Array.isArray(firstUserMsg.content) ?
+        firstUserMsg.content.find(c => c.type === 'text')?.text || '' :
+        firstUserMsg.content) : '';
+
+    // Build transcript
+    const transcript = agentConversation.map(m => {
+      const role = m.role === 'user' ? '👤 TECH' : '🤖 AGENT';
+      const content = Array.isArray(m.content) ?
+        m.content.filter(c => c.type === 'text').map(c => c.text).join(' ') :
+        m.content;
+      return `${role}: ${content}`;
+    }).join('\n\n');
+
+    // Extract symptom from first user message
+    const symptom = firstText.replace(/\[Context:.*?\]/g, '').trim().slice(0, 300);
+
+    // Look for diagnosis/fix info in agent responses
+    const agentReplies = agentConversation
+      .filter(m => m.role === 'assistant')
+      .map(m => typeof m.content === 'string' ? m.content : '')
+      .join(' ');
+
+    // Get saw info from dropdowns
+    const brand = document.getElementById('sawBrand')?.value || '';
+    const model = document.getElementById('sawModel')?.value || '';
+    const techName = msAccount?.name || document.getElementById('co-tech')?.value || '—';
+
+    // Check if this session already exists in caseDB
+    const existingIdx = caseDB.findIndex(c => c.id === agentSessionId);
+
+    const sessionCase = {
+      id: agentSessionId,
+      jobNum: agentSessionId,
+      date: new Date().toLocaleDateString('en-CA'),
+      customer: jobs.length > 0 ? (jobs[0].customer || '—') : '—',
+      saw: brand && model ? `${brand} ${model}` : (brand || 'Unknown'),
+      tech: techName,
+      systems: detectSystems(symptom + ' ' + agentReplies),
+      symptom: symptom || 'Diagnostic session',
+      rootCause: extractSection(agentReplies, ['root cause', 'cause', 'problem is', 'issue is', 'diagnosis']),
+      fix: extractSection(agentReplies, ['recommend', 'replace', 'adjust', 'fix', 'repair', 'solution']),
+      parts: [],
+      hours: 0,
+      outcome: 'followup',
+      flags: '',
+      transcript: transcript,
+      photos: agentSessionPhotos.slice(0, 4).map(p => p.dataUrl),
+      isDraft: true, // mark as AI session draft
+      autoSaved: new Date().toISOString()
+    };
+
+    if (existingIdx >= 0) {
+      caseDB[existingIdx] = sessionCase;
+    } else {
+      caseDB.unshift(sessionCase);
+    }
+
+    renderCases();
+    renderTraining();
+    // Sync to SharePoint if signed in
+    if (msAccount) syncCaseToSharePoint(sessionCase);
+  }
+
+  function detectSystems(text) {
+    const t = text.toLowerCase();
+    const systems = [];
+    if (t.includes('hydraul') || t.includes('cylinder') || t.includes('valve') || t.includes('pump') || t.includes('oil') || t.includes('fluid')) systems.push('hydraulic');
+    if (t.includes('electric') || t.includes('motor') || t.includes('switch') || t.includes('relay') || t.includes('vfd') || t.includes('wiring') || t.includes('control')) systems.push('electrical');
+    if (t.includes('blade') || t.includes('guide') || t.includes('bearing') || t.includes('gear') || t.includes('belt') || t.includes('mechanical') || t.includes('align')) systems.push('mechanical');
+    if (t.includes('pneumat') || t.includes('air') || t.includes('cylinder') && !systems.includes('hydraulic')) systems.push('pneumatic');
+    return systems.length > 0 ? systems : ['mechanical'];
+  }
+
+  function extractSection(text, keywords) {
+    const sentences = text.split(/[.!?]\s+/);
+    const matches = sentences.filter(s => keywords.some(k => s.toLowerCase().includes(k)));
+    return matches.slice(0, 3).join('. ').slice(0, 500);
+  }
 
   const AGENT_SYSTEM = `You are an expert industrial maintenance technician and diagnostician for Tri-County Band Saw Service — a company that services metal-cutting band saws for industrial customers across Ontario, Canada.
 
@@ -2901,6 +3462,8 @@ Keep responses concise and actionable. The tech is on-site with a customer — t
 
     input.value = '';
     agentPhotos = [];
+    // Track photos for case study
+    if (photos.length) agentSessionPhotos.push(...photos);
     renderAgentPhotoStrip();
 
     // Build message for API
@@ -2973,6 +3536,10 @@ Keep responses concise and actionable. The tech is on-site with a customer — t
         .replace(/^- /gm, '• ');
 
       appendMessage('agent', formatted);
+
+      // Auto-save conversation as case study draft
+      clearTimeout(agentAutoSaveTimer);
+      agentAutoSaveTimer = setTimeout(() => autoSaveConversation(), 2000);
 
       // Detect PART_NEEDED lines and offer to add to job list
       const partMatches = [...replyText.matchAll(/PART_NEEDED:\s*([^|]+)\|([^|]*)\|([^\n]*)/g)];
@@ -3458,7 +4025,7 @@ Keep responses concise and actionable. The tech is on-site with a customer — t
     const newCase = {
       id: d.jobNum, jobNum: d.jobNum, date: d.today,
       customer: d.customer || '—', saw: d.saw,
-      tech: document.getElementById('co-tech')?.value || '—',
+      tech: document.getElementById('co-tech')?.value || (msAccount?.name || '—'),
       systems: d.systems,
       symptom: d.symptom, rootCause: d.rootCause, fix: d.fix,
       parts: d.parts.map(p => ({ partNum: p.partNum, name: p.name, qty: p.qty, price: p.price })),
@@ -3466,9 +4033,17 @@ Keep responses concise and actionable. The tech is on-site with a customer — t
     };
 
     caseDB.unshift(newCase);
+
+    // Remove submitted job from active jobs
+    if (window._closeoutJobId) {
+      jobs = jobs.filter(j => j.id !== window._closeoutJobId);
+      window._closeoutJobId = null;
+    }
+
     closeCloseout();
     jobItems = [];
-    updateJobList();
+    renderJobs();
+    updateJobBadge();
     showToast('✅ Job submitted. Case study saved!');
     renderCases();
     renderTraining();
@@ -3512,6 +4087,50 @@ Keep responses concise and actionable. The tech is on-site with a customer — t
   function copyExportText() {
     const text = document.getElementById('exportContent').innerText;
     navigator.clipboard.writeText(text).then(() => showToast('📋 Copied to clipboard'));
+  }
+
+  function downloadExport() {
+    const title = document.getElementById('exportTitle').textContent || 'Export';
+    const content = document.getElementById('exportContent').innerHTML;
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title>
+    <style>body{font-family:Arial,sans-serif;font-size:13px;line-height:1.7;max-width:700px;margin:40px auto;color:#1a1a1a;}
+    h1,h2,h3{color:#c2410c;}table{width:100%;border-collapse:collapse;}td,th{border:1px solid #ddd;padding:8px;}th{background:#f5f5f5;}</style>
+    </head><body>${content}</body></html>`;
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = title.replace(/[^a-z0-9]/gi, '-').toLowerCase() + '.html';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('✅ Downloaded');
+  }
+
+  function printExport() {
+    const title = document.getElementById('exportTitle').textContent || 'Export';
+    const content = document.getElementById('exportContent').innerHTML;
+    const win = window.open('', '_blank');
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title>
+    <style>body{font-family:Arial,sans-serif;font-size:13px;line-height:1.7;max-width:700px;margin:40px auto;color:#1a1a1a;}
+    h1,h2,h3{color:#c2410c;}table{width:100%;border-collapse:collapse;}td,th{border:1px solid #ddd;padding:8px;}th{background:#f5f5f5;}
+    @media print{body{margin:20px;}}</style></head><body>${content}</body></html>`);
+    win.document.close();
+    setTimeout(() => { win.print(); }, 500);
+  }
+
+  async function shareExport() {
+    const title = document.getElementById('exportTitle').textContent || 'Tri-County Export';
+    const text = document.getElementById('exportContent').innerText;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, text });
+        showToast('✅ Shared');
+      } catch(e) {
+        if (e.name !== 'AbortError') showToast('Share cancelled');
+      }
+    } else {
+      navigator.clipboard.writeText(text).then(() => showToast('✅ Copied — paste to share'));
+    }
   }
 
   function generateCasePDF(d) {
@@ -3650,12 +4269,13 @@ Keep responses concise and actionable. The tech is on-site with a customer — t
       <div class="empty-state">
         <div class="empty-icon">📁</div>
         <div class="empty-title">No Cases Found</div>
-        <div class="empty-sub">Submit a job to auto-generate your first case study</div>
+        <div class="empty-sub">Submit a job or chat with the AI Agent to auto-generate case studies</div>
       </div>` :
     cases.map(c => `
       <div class="case-card" onclick="toggleCase(this)">
         <div class="case-header">
           <div style="display:flex; flex-direction:column; gap:4px; flex-shrink:0;">
+            ${c.isDraft ? `<span style="background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3);font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:9px;letter-spacing:0.12em;text-transform:uppercase;padding:2px 6px;border-radius:2px;">🤖 AI Draft</span>` : ''}
             ${c.systems.map(s => `<span class="case-system-tag ${sysTagMap[s]||''}">${s}</span>`).join('')}
           </div>
           <div class="case-info">
@@ -3665,6 +4285,7 @@ Keep responses concise and actionable. The tech is on-site with a customer — t
               <span>🔧 ${c.saw}</span>
               <span>👤 ${c.tech}</span>
               <span>${outcomeIcon[c.outcome]||''}</span>
+              ${c.isDraft ? `<span style="color:#fbbf24;">Auto-saved</span>` : ''}
             </div>
           </div>
         </div>
@@ -3672,7 +4293,7 @@ Keep responses concise and actionable. The tech is on-site with a customer — t
           <div class="case-step">
             <div class="case-step-num">1</div>
             <div class="case-step-content">
-              <div class="case-step-title">Symptom</div>
+              <div class="case-step-title">Symptom / Problem Reported</div>
               <div class="case-step-text">${c.symptom}</div>
             </div>
           </div>
@@ -3680,14 +4301,14 @@ Keep responses concise and actionable. The tech is on-site with a customer — t
             <div class="case-step-num">2</div>
             <div class="case-step-content">
               <div class="case-step-title">Root Cause</div>
-              <div class="case-step-text">${c.rootCause}</div>
+              <div class="case-step-text">${c.rootCause || (c.isDraft ? 'Diagnostic in progress — see transcript below' : 'Not recorded')}</div>
             </div>
           </div>
           <div class="case-step">
             <div class="case-step-num">3</div>
             <div class="case-step-content">
               <div class="case-step-title">Fix Performed</div>
-              <div class="case-step-text">${c.fix}</div>
+              <div class="case-step-text">${c.fix || (c.isDraft ? 'See transcript for agent recommendations' : 'Not recorded')}</div>
             </div>
           </div>
           <div class="case-step">
@@ -3697,25 +4318,25 @@ Keep responses concise and actionable. The tech is on-site with a customer — t
               <div class="case-step-text">${c.parts && c.parts.length ? c.parts.map(p=>`${p.name} (${p.partNum}) × ${p.qty}`).join(', ') : 'None — adjustment only'}</div>
             </div>
           </div>
+          ${c.transcript ? `
+          <div class="case-step">
+            <div class="case-step-num">💬</div>
+            <div class="case-step-content">
+              <div class="case-step-title">AI Diagnostic Transcript</div>
+              <div class="case-step-text" style="white-space:pre-wrap;font-size:11px;color:var(--dim);max-height:200px;overflow-y:auto;">${c.transcript}</div>
+            </div>
+          </div>` : ''}
           ${c.flags && c.flags !== 'None' ? `
           <div style="background:var(--orange-glow);border-left:3px solid var(--orange);padding:8px 12px;border-radius:0 3px 3px 0;font-size:12px;margin-bottom:10px;">
             <span style="color:var(--orange);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;">⚑ Flag for Next Visit</span><br>${c.flags}
           </div>` : ''}
           ${c.photos && c.photos.length ? `
           <div style="margin-bottom:12px;">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--dim);margin-bottom:8px;">📷 Media (${c.photos.length})</div>
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
-              ${c.photos.map((p,mi)=> {
-                const isVid = p.type === 'video';
-                return `<div style="border-radius:3px;overflow:hidden;border:1px solid var(--rule);cursor:pointer;" onclick="openSavedMedia('${p.dataUrl}','${(p.caption||'').replace(/'/g,"\\'")}','${p.type||'image'}')">
-                  ${isVid
-                    ? `<div style="position:relative;height:80px;background:#000;display:flex;align-items:center;justify-content:center;">
-                        <video src="${p.dataUrl}" style="width:100%;height:80px;object-fit:cover;pointer-events:none;"></video>
-                        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);">
-                          <div style="width:28px;height:28px;background:var(--orange);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;">▶</div>
-                        </div>
-                        <div style="position:absolute;top:3px;left:3px;background:var(--orange);color:#000;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:8px;letter-spacing:0.1em;text-transform:uppercase;padding:2px 4px;border-radius:2px;">VIDEO</div>
-                      </div>`
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--dim);margin-bottom:8px;">📷 Photos (${c.photos.length})</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              ${c.photos.map(p => `<img src="${typeof p === 'string' ? p : p.dataUrl}" style="width:80px;height:60px;object-fit:cover;border-radius:3px;border:1px solid var(--rule);">`).join('')}
+            </div>
+          </div>` : ''}
                     : `<img src="${p.dataUrl}" style="width:100%;height:80px;object-fit:cover;display:block;">`}
                   ${p.caption ? `<div style="font-size:10px;color:var(--dim);padding:3px 5px;background:var(--iron)">${p.caption}</div>` : ''}
                 </div>`;
@@ -4105,10 +4726,10 @@ Keep responses concise and actionable. The tech is on-site with a customer — t
     applyStoredPrices();
     renderCases();
     renderTraining();
-    // Small delay to ensure MSAL library is loaded
-    setTimeout(() => {
-      initMsal();
-    }, 500);
+    renderJobs();
+    updateJobBadge();
+    agentSessionId = 'DIAG-' + Date.now(); // start first session
+    setTimeout(() => { initMsal(); }, 500);
   });
 
 </script>
