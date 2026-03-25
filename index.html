@@ -4337,12 +4337,6 @@ Keep responses concise and actionable. The tech is on-site with a customer — t
               ${c.photos.map(p => `<img src="${typeof p === 'string' ? p : p.dataUrl}" style="width:80px;height:60px;object-fit:cover;border-radius:3px;border:1px solid var(--rule);">`).join('')}
             </div>
           </div>` : ''}
-                    : `<img src="${p.dataUrl}" style="width:100%;height:80px;object-fit:cover;display:block;">`}
-                  ${p.caption ? `<div style="font-size:10px;color:var(--dim);padding:3px 5px;background:var(--iron)">${p.caption}</div>` : ''}
-                </div>`;
-              }).join('')}
-            </div>
-          </div>` : ''}
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); addCasePartsFromId('${c.id}')">+ Add Parts to Job</button>
             <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); generateTrainingCard(caseDB.find(x=>x.id==='${c.id}'))">🃏 Training Card</button>
