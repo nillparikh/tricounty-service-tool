@@ -982,7 +982,10 @@ window.addEventListener('error', function(e) {
           <div style="font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:11px; letter-spacing:0.15em; text-transform:uppercase; color:var(--dim); margin-bottom:6px;">Symptom reported by customer</div>
           <textarea class="form-textarea" id="co-symptom" rows="2" placeholder="e.g. Blade drifting left, won't start, head dropping too fast..."></textarea>
 
-          <button class="btn btn-primary btn-full" style="margin-top:16px;" onclick="coNext(1)">Next →</button>
+          <div style="display:flex; gap:8px; margin-top:16px;">
+            <button class="btn btn-secondary" onclick="closeCloseout()">✕ Cancel</button>
+            <button class="btn btn-primary btn-full" onclick="coNext(1)">Next →</button>
+          </div>
         </div>
 
         <!-- Step 2: Root Cause -->
@@ -2636,7 +2639,7 @@ window.addEventListener('error', function(e) {
   }
 
   // --- CASE STUDIES ---
-  function toggleCase(card) { card.querySelector('.case-body').classList.toggle('open'); }
+  function toggleCase(card) { card.classList.toggle('open'); }
   function filterChip(btn, filter) {
     document.querySelectorAll('.filter-chips .chip').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
@@ -4279,6 +4282,24 @@ Keep responses concise and actionable. The tech is on-site with a customer — t
     updateJobBadge();
     agentSessionId = 'DIAG-' + Date.now(); // start first session
     setTimeout(() => { initMsal(); }, 500);
+
+    // ESC key closes any open overlay
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      const overlays = [
+        { id: 'mediaFullscreenOverlay', fn: closeMediaFullscreen },
+        { id: 'exportOverlay',          fn: closeExport },
+        { id: 'newCaseOverlay',         fn: closeNewCase },
+        { id: 'jobSelectorOverlay',     fn: closeJobSelector },
+        { id: 'closeoutOverlay',        fn: closeCloseout },
+      ];
+      for (const o of overlays) {
+        const el = document.getElementById(o.id);
+        if (el && el.style.display !== 'none' && el.style.display !== '') {
+          o.fn(); return;
+        }
+      }
+    });
   });
 
 </script>
